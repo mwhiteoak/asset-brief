@@ -1,0 +1,7 @@
+# Upper-bounded so a breaking major release can't silently kill a 5:30am run.
+# Patch and minor updates still flow through. Bump deliberately, then dry-run.
+anthropic>=0.72,<1.0
+requests>=2.31,<3.0
+PyYAML>=6.0,<7.0
+pypdf>=6.0,<7.0
+python-dotenv>=1.0,<2.0

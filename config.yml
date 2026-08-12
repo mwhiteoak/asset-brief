@@ -1,0 +1,181 @@
+# ============================================================================
+# The Asset Brief — configuration
+# This file is the control panel. Edit freely; no code changes needed.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# SOURCE ALLOWLIST — enforced at the API level. Claude's web search is
+# restricted to these domains only: it cannot search or cite anything else.
+# Add a domain to admit a source; remove it to ban one.
+# ----------------------------------------------------------------------------
+# IMPORTANT: a domain that blocks Anthropic's crawler causes the API to reject
+# the WHOLE search request with a 400 — one bad entry kills an entire research
+# cluster. The code strips offending domains and retries automatically, but it
+# logs a warning each time; prune them from here when you see one.
+# Verified blocked as at Aug 2026 (do not re-add): afr.com, theaustralian.com.au,
+# couriermail.com.au, smh.com.au, theage.com.au, brisbanetimes.com.au,
+# qsrmedia.com.au.
+allowed_domains:
+  # Property trade press
+  - australianpropertyjournal.com.au
+  - theurbandeveloper.com
+  - realcommercial.com.au
+  - commercialrealestate.com.au
+  - rebonline.com.au
+  - thepropertytribune.com.au
+  # Mainstream / business press that permits the crawler.
+  # Verified blocked as at Aug 2026 (do not re-add): abc.net.au, news.com.au,
+  # theguardian.com. Between these and the mastheads above, assume general
+  # news is unavailable and that the trade press carries this brief.
+  - businessnewsaustralia.com
+  # Industry bodies
+  - propertycouncil.com.au
+  - aicd.com.au
+  - retail.org.au
+  - nra.net.au
+  - proptechassociation.com.au
+  # Retail & tenant trade press
+  - insideretail.com.au
+  - shoppingcentrenews.com.au
+  - insidefmcg.com.au
+  - ragtrader.com.au
+  # Alternatives trade press
+  - thesector.com.au
+  - australianageingagenda.com.au
+  - agedcareinsite.com.au
+  - theweeklysource.com.au
+  # Agencies
+  - cbre.com.au
+  - cbre.com
+  - jll.com.au
+  - jll.com
+  - colliers.com.au
+  - colliers.com
+  - knightfrank.com.au
+  - savills.com.au
+  - cushmanwakefield.com
+  - burgessrawson.com.au
+  # Exchanges / official data
+  - asx.com.au
+  - announcements.asx.com.au
+  - rba.gov.au
+  - abs.gov.au
+
+# ----------------------------------------------------------------------------
+# RELEVANCE GATE — every finding is scored 0-10 for how actionable it is to the
+# audience (see AUDIENCE in daily_brief.py). Anything below the threshold is
+# dropped before the editor ever sees it, so junk can't reach the email.
+# Raise it if the brief feels padded; lower it if it feels thin.
+#   6 = only things with a clear "so what" for the reader's day job
+#   5 = balanced (default)
+#   4 = wider net, more sector context
+# ----------------------------------------------------------------------------
+min_relevance: 5
+
+# Hard recency ceiling in days, enforced in code (not just asked of the model).
+# Any finding without a verifiable publication date, or older than this, is
+# rejected outright. Agency and trade-press pages rank well in search for
+# years — this is what stops a decade-old sale being printed as a current
+# comparable. Do not raise it above ~10 without a good reason.
+max_finding_age_days: 7
+
+# The Grok research pass reads the mastheads Anthropic's crawler is blocked
+# from (afr.com, theaustralian.com.au, smh.com.au...) — but it searches the
+# open web, so allowed_domains does NOT constrain it. Off-list domains it
+# brings in are logged either way.
+#   false (default) — keep the masthead access; new sources are reported
+#   true            — restore the hard "nothing outside the list" guarantee,
+#                     at the cost of dropping anything not pre-approved
+enforce_allowlist_for_grok: false
+
+# ----------------------------------------------------------------------------
+# FORWARD CALENDAR — the RBA publishes its decision dates a year ahead. Paste
+# the remaining ones here each January; past dates are ignored automatically.
+# Nothing is inferred, so an empty list simply omits RBA dates from the
+# "On the horizon" section rather than guessing.
+# ----------------------------------------------------------------------------
+rba_meeting_dates:
+  - 2026-09-15
+  - 2026-11-03
+  - 2026-12-08
+
+# ----------------------------------------------------------------------------
+# WATCHLIST — anything matching these gets flagged and elevated in the brief.
+# EDIT THESE to your actual portfolio, tenant roster and competitor set.
+# ----------------------------------------------------------------------------
+watchlist:
+  # Tenants across your assets — administrations, rollouts, closures involving
+  # these become lead items
+  tenants:
+    - Coles
+    - Woolworths
+    - Chemist Warehouse
+    - Best & Less
+    - Goodstart Early Learning
+    - G8 Education
+  # Your own group — mentions get flagged, but the editor is told this is you,
+  # not a rival, so it doesn't write about your own deals in competitor framing.
+  own_group:
+    - Clarence Property
+  # Competitors and peers whose deals you track
+  competitors:
+    - Sentinel Property Group
+    - RAM (Real Asset Management)
+    - Precision Group
+    - Fawkner Property
+    - Forza Capital
+    - Marquette Properties
+  # Suburbs / precincts / named assets you own or are watching
+  markets:
+    - Toowoomba
+    - Townsville
+    - Casuarina
+  # Agents whose campaigns you follow
+  agents: []
+
+# ----------------------------------------------------------------------------
+# ASX TICKERS — price-sensitive announcements are pulled directly from the
+# ASX announcements API for every code here, each edition.
+# ----------------------------------------------------------------------------
+asx_tickers:
+  # A-REITs & fund managers
+  - GMG   # Goodman Group
+  - SCG   # Scentre Group
+  - VCX   # Vicinity Centres
+  - DXS   # Dexus
+  - GPT   # GPT Group
+  - MGR   # Mirvac
+  - SGP   # Stockland
+  - CHC   # Charter Hall
+  - CQR   # Charter Hall Retail REIT
+  - CQE   # Charter Hall Social Infrastructure REIT (childcare)
+  - RGN   # Region Group
+  - HMC   # HMC Capital
+  - HDN   # HomeCo Daily Needs REIT
+  - ARF   # Arena REIT (childcare / healthcare)
+  - CNI   # Centuria Capital
+  - CIP   # Centuria Industrial REIT
+  - COF   # Centuria Office REIT
+  - BWP   # BWP Trust
+  - WPR   # Waypoint REIT
+  - ABG   # Abacus Group
+  # NSR and HPI removed Aug 2026 — both delisted, the API 400s on them.
+  # Major tenants & retailers
+  - COL   # Coles
+  - WOW   # Woolworths
+  - WES   # Wesfarmers
+  - JBH   # JB Hi-Fi
+  - HVN   # Harvey Norman
+  - SUL   # Super Retail Group
+  - PMV   # Premier Investments
+  - MYR   # Myer
+  - LOV   # Lovisa
+  - NCK   # Nick Scali
+  - AX1   # Accent Group
+  - BBN   # Baby Bunting
+  - DMP   # Domino's
+  - CKF   # Collins Foods
+  - GYG   # Guzman y Gomez
+  # Childcare & aged care operators
+  - GEM   # G8 Education
+  - REG   # Regis Healthcare

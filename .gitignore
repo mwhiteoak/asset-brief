@@ -1,0 +1,17 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Local dry-run / debug output
+brief_preview.html
+run.log
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/

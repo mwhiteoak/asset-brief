@@ -1,0 +1,103 @@
+name: Daily Asset Brief
+
+on:
+  schedule:
+    # 19:30 UTC Sun-Thu = 5:30am AEST Mon-Fri (Brisbane, no DST).
+    # GitHub cron can run 5-15 min late; email typically lands ~5:45am.
+    - cron: "30 19 * * 0-4"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (build HTML, don't send)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # needed to commit memory + archive back to the repo
+
+# Two editions must never build at once: they would both send, and both append
+# to data/memory.json, corrupting the comparables database the trend engine
+# reads. A manual run while the schedule is firing waits its turn.
+concurrency:
+  group: daily-asset-brief
+  cancel-in-progress: false
+
+jobs:
+  send-brief:
+    runs-on: ubuntu-latest
+    # 3 Anthropic research clusters + a Grok pass + an Opus editor pass, plus
+    # any ASX PDF deep-reads. Measured runs land around 8-12 minutes; the
+    # headroom is for results season when three PDFs get analysed on top.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate and send brief
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+        run: |
+          set -o pipefail
+          python -u daily_brief.py 2>&1 | tee run.log
+
+      - name: Summarise run
+        # Runs even on failure so a dead 5:30am job explains itself on the
+        # Actions summary page instead of making you read raw logs.
+        if: always()
+        run: |
+          {
+            echo "### Asset Brief run"
+            echo ""
+            grep -E '^COST' run.log 2>/dev/null | sed 's/^/    /' || echo "_no cost recorded_"
+            echo ""
+            echo "**Findings kept per source**"
+            echo '```'
+            grep -E '^\[info\] .*: [0-9]+ kept' run.log 2>/dev/null || echo "none"
+            echo '```'
+            STALE=$(grep -c 'REJECTED STALE' run.log 2>/dev/null || echo 0)
+            echo "Stale/undated findings rejected: **$STALE**"
+            echo ""
+            if grep -qE '^\[warn\]|^FAILED' run.log 2>/dev/null; then
+              echo "<details><summary>Warnings</summary>"
+              echo ""
+              echo '```'
+              grep -E '^\[warn\]|^FAILED' run.log | head -40
+              echo '```'
+              echo "</details>"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit memory and archive
+        if: ${{ success() && !inputs.dry_run }}
+        run: |
+          git config user.name "asset-brief-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A data docs 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "Edition $(date -u +%F) [skip ci]"
+          # Rebase before pushing so a manual commit landing mid-run doesn't
+          # fail the step and lose the edition's memory records.
+          git pull --rebase --autostash || true
+          git push
+
+      - name: Upload preview (dry runs only)
+        if: ${{ always() && inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: brief-preview
+          path: |
+            brief_preview.html
+            run.log
+          if-no-files-found: warn
