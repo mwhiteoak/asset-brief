@@ -154,7 +154,7 @@ watchlist:
   # Your own group — mentions get flagged, but the editor is told this is you,
   # not a rival, so it doesn't write about your own deals in competitor framing.
   own_group:
-    - Clarence Property
+    - 
   # Competitors and peers whose deals you track
   competitors:
     - Sentinel Property Group
@@ -163,11 +163,15 @@ watchlist:
     - Fawkner Property
     - Forza Capital
     - Marquette Properties
+    - Clarence Property
   # Suburbs / precincts / named assets you own or are watching
   markets:
     - Toowoomba
     - Townsville
-    - Casuarina
+    - Brisbane
+    - Gold Coast
+    -Sydney
+    
   # Agents whose campaigns you follow
   agents: []
 
