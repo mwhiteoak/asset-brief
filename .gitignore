@@ -5,7 +5,7 @@
 
 # Local dry-run / debug output
 brief_preview.html
-run.log
+run*.log
 
 # macOS
 .DS_Store

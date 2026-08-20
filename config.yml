@@ -62,6 +62,34 @@ allowed_domains:
   - abs.gov.au
 
 # ----------------------------------------------------------------------------
+# YOUR PORTFOLIO — the single highest-leverage thing in this file.
+#
+# Right now the brief knows the industry but not your book, so it can only ask
+# "is this important?". Fill this in and it can ask the far better question:
+# "does this touch an asset we own?" — a competing centre trading in your
+# catchment, your anchor tenant's network plans, an expiry you are exposed to.
+# Every finding gets scored against this, and anything touching it is elevated.
+#
+# It never leaves your private repo. Add as much or as little as you like;
+# omit anything commercially sensitive. Even just names and suburbs helps.
+#
+# portfolio:
+#   - asset: Casuarina Square
+#     sector: retail
+#     suburb: Casuarina
+#     state: NSW
+#     anchors: [Coles, Kmart]
+#     notes: 12,000sqm neighbourhood centre; major expiry FY28
+#   - asset: Toowoomba industrial estate
+#     sector: industrial
+#     suburb: Toowoomba
+#     state: QLD
+#     anchors: []
+#     notes: 3 tenancies, WALE 4.2yrs
+# ----------------------------------------------------------------------------
+portfolio: []
+
+# ----------------------------------------------------------------------------
 # RELEVANCE GATE — every finding is scored 0-10 for how actionable it is to the
 # audience (see AUDIENCE in daily_brief.py). Anything below the threshold is
 # dropped before the editor ever sees it, so junk can't reach the email.
@@ -87,6 +115,16 @@ max_finding_age_days: 7
 #   true            — restore the hard "nothing outside the list" guarantee,
 #                     at the cost of dropping anything not pre-approved
 enforce_allowlist_for_grok: false
+
+# Domains the Grok passes must never contribute, regardless of score. These
+# are retail-investor stock commentary and content farms — the rubric already
+# scores share-price chatter as noise, but this stops it reaching the scorer.
+blocked_domains:
+  - fool.com.au
+  - motleyfool.com.au
+  - marketindex.com.au
+  - hotcopper.com.au
+  - simplywall.st
 
 # ----------------------------------------------------------------------------
 # FORWARD CALENDAR — the RBA publishes its decision dates a year ahead. Paste
@@ -159,6 +197,19 @@ asx_tickers:
   - BWP   # BWP Trust
   - WPR   # Waypoint REIT
   - ABG   # Abacus Group
+  # Added Aug 2026 after a gap analysis found their results and announcements
+  # were being discussed industry-wide while absent from the brief.
+  - LLC   # Lendlease Group
+  - CLW   # Charter Hall Long WALE REIT
+  - CDP   # Carindale Property Trust (owns Westfield Carindale)
+  - GOZ   # Growthpoint Properties
+  - DXI   # Dexus Industria REIT
+  - CMW   # Cromwell Property Group
+  - GDI   # GDI Property Group
+  - HCW   # HealthCo Healthcare & Wellness REIT
+  - INA   # Ingenia Communities (land lease)
+  - LIC   # Lifestyle Communities (land lease)
+  - QAL   # Qualitas (real estate private credit — debt market read)
   # NSR and HPI removed Aug 2026 — both delisted, the API 400s on them.
   # Major tenants & retailers
   - COL   # Coles

@@ -61,13 +61,16 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 # are already in the environment, and real env vars always win over the file.
 load_dotenv(os.path.join(ROOT, ".env"))
 
-with open(os.path.join(ROOT, "config.yml")) as f:
-    CONFIG = yaml.safe_load(f)
-
+# Config is applied by configure(), not at import — that is what lets both
+# editions run as functions in one process. Defaults keep the module importable
+# and keep `python daily_brief.py` working as the property daily.
+CONFIG_PATH = os.environ.get("BRIEF_CONFIG", os.path.join(ROOT, "config.yml"))
+CONFIG: dict = {}
 BRIEF_NAME = "The Asset Brief"
-# Recipients live in the RECIPIENT_EMAIL secret (comma-separated) so no real
-# address sits in source. All recipients are BCC'd, so addresses stay private
-# from each other. Falls back to GMAIL_ADDRESS — i.e. send to yourself.
+EDITION = None
+CADENCE = "daily"
+MEMORY_PATH = brief_memory.path_for(None)
+
 TIMEZONE = ZoneInfo("Australia/Brisbane")
 DEAL_THRESHOLD = "$5 million"
 
@@ -95,16 +98,170 @@ PRICING = {
 # trip a per-request timeout while data is trickling, so this is what actually
 # keeps the run inside the workflow budget.
 RESEARCH_DEADLINE_S = 900
+# Edition hooks: COVERAGE replaces the Grok pass's topic list, and the
+# comparables hunt only makes sense where assets trade on a yield.
+COVERAGE = ""
+BRIEF_DESC = ""
+PRIORITY_SOURCES = None
+INTEL_CATEGORIES = ""
+TICKER_NOTES = {}
+SHOW_MARKET_SIGNALS = True
+ENABLE_COMPARABLES = True
 
-MIN_RELEVANCE = int(CONFIG.get("min_relevance", 5))
+MIN_RELEVANCE = 5
 # Hard recency ceiling, enforced in code. The research window is 48-76 hours;
 # this allows for search-index lag without letting genuinely old stories in.
-MAX_FINDING_AGE_DAYS = int(CONFIG.get("max_finding_age_days", 7))
+MAX_FINDING_AGE_DAYS = 7
+# Undated findings scoring at or above this get a targeted date lookup before
+# being rejected. Below it, the extra call isn't worth the spend.
+DATE_RECHECK_MIN_RELEVANCE = 7
+# One age limit for everything was wrong, and it kept costing real content: a
+# comparable rejected at 8 days (the trend engine cohorts over 90), quarterly
+# research at 13 days, and an ACCC penalty against a watchlist franchisor at
+# 16. How long a record stays USEFUL depends on what it is used for, so the
+# ceiling varies by source. News still gets the strict limit.
+AGE_LIMIT_BY_SOURCE: dict = {}
+
+
+def _age_limit(name: str) -> int:
+    return AGE_LIMIT_BY_SOURCE.get(name, MAX_FINDING_AGE_DAYS)
+
+
+# Snapshot of every prompt-level global an edition may override, captured once
+# at import. configure() restores from this before applying a new edition's
+# overrides — without it, switching editions in one process leaks the previous
+# edition's prompts into the next, which is exactly the failure this design
+# was meant to remove.
+_OVERRIDABLE = ("AUDIENCE", "RELEVANCE_RUBRIC", "RESEARCH_CLUSTERS",
+                "SECTION_PLAN", "COVERAGE", "INTEL_CATEGORIES", "BRIEF_DESC",
+                "PRIORITY_SOURCES", "GEOGRAPHY", "DEAL_THRESHOLD")
+_DEFAULTS: dict = {}
+
+
+def _snapshot_defaults() -> None:
+    if not _DEFAULTS:
+        for k in _OVERRIDABLE:
+            _DEFAULTS[k] = globals()[k]
+
+
+def configure(config_path: str, **overrides) -> None:
+    """Load an edition's config and apply it to this module.
+
+    Everything edition-specific lives in module state that the pipeline reads.
+    Setting it here — in one explicit place, from one dict — is what makes
+    two editions runnable in a single process, and makes it obvious what an
+    edition is allowed to change.
+    """
+    global CONFIG, CONFIG_PATH, BRIEF_NAME, EDITION, CADENCE, MEMORY_PATH
+    global TICKER_NOTES, SHOW_MARKET_SIGNALS, ENABLE_COMPARABLES
+    global MIN_RELEVANCE, MAX_FINDING_AGE_DAYS, DATE_RECHECK_MIN_RELEVANCE
+    global AGE_LIMIT_BY_SOURCE, PORTFOLIO, PORTFOLIO_BRIEF
+    global COVERAGE, BRIEF_DESC, PRIORITY_SOURCES, INTEL_CATEGORIES
+    global AUDIENCE, RELEVANCE_RUBRIC, RESEARCH_CLUSTERS, SECTION_PLAN
+    global GEOGRAPHY, DEAL_THRESHOLD
+
+    _snapshot_defaults()
+    # Reset to the property-brief baseline so an edition inherits only what it
+    # does not override, and nothing carries over from a previous edition.
+    for k, v in _DEFAULTS.items():
+        globals()[k] = v
+
+    CONFIG_PATH = config_path
+    with open(config_path) as fh:
+        CONFIG = yaml.safe_load(fh)
+
+    BRIEF_NAME = CONFIG.get("brief_name", "The Asset Brief")
+    EDITION = CONFIG.get("edition")
+    CADENCE = CONFIG.get("cadence", "daily")
+    MEMORY_PATH = brief_memory.path_for(EDITION)
+    TICKER_NOTES = CONFIG.get("ticker_notes") or {}
+    SHOW_MARKET_SIGNALS = bool(CONFIG.get("show_market_signals", True))
+    ENABLE_COMPARABLES = bool(CONFIG.get("enable_comparables", True))
+    MIN_RELEVANCE = int(CONFIG.get("min_relevance", 5))
+    MAX_FINDING_AGE_DAYS = int(CONFIG.get("max_finding_age_days", 7))
+    DATE_RECHECK_MIN_RELEVANCE = int(CONFIG.get("date_recheck_min_relevance", 7))
+    AGE_LIMIT_BY_SOURCE = {
+        "grok_comps": int(CONFIG.get("max_comparable_age_days", 30)),
+        "grok_intel": int(CONFIG.get("max_intel_age_days", 45)),
+    }
+    PORTFOLIO = CONFIG.get("portfolio") or []
+    PORTFOLIO_BRIEF = _portfolio_brief(PORTFOLIO)
+
+    # Prompt-level overrides an edition may supply. Anything omitted keeps the
+    # property-brief default, so a new edition only states its differences.
+    for key, value in overrides.items():
+        if value is not None:
+            globals()[key.upper()] = value
 
 GEOGRAPHY = (
     "Australia-wide, with strongest emphasis on Queensland and New South Wales. "
     "Always include significant national deals but lead QLD/NSW where possible."
 )
+
+# The book itself. Empty until config.yml's portfolio list is filled in — at
+# which point every pass can score against "does this touch an asset we own?"
+# rather than only "is this important in the industry?".
+PORTFOLIO: list = []
+PORTFOLIO_BRIEF = ""
+
+
+def _portfolio_brief(portfolio: list) -> str:
+    return (
+    "THE READER'S ACTUAL PORTFOLIO — anything touching these assets, their "
+    "anchor tenants, their suburbs or their direct catchment competitors is "
+    "the most valuable thing you can find, and scores 9-10 even if it would "
+    "otherwise be a minor item. A competing centre trading two suburbs away "
+    "is a direct comparable for their valuation; their anchor tenant's "
+    "network plans are their income risk:\n"
+        + json.dumps(portfolio, indent=1)
+    ) if portfolio else (
+        "The reader's specific asset list is not configured, so score on "
+        "sector, geography and watchlist relevance alone."
+    )
+
+SECTION_PLAN = '''SECTIONS, in order. OMIT any section with no genuine news — do not pad it with
+a placeholder line. Only if the entire edition is thin, say so once at the top
+in a wry sentence:
+0. THE STRATEGIC READ — 3-4 sentences, in <p> tags, written for the CEO/COO.
+   Not a summary of what follows. Answer: given today's flow, what should this
+   group be doing with capital — buying, selling, holding, refinancing, or
+   watching? Name the evidence you are reasoning from. If the day's findings
+   genuinely don't support a strategic view, say so in one line rather than
+   manufacturing one — a fabricated strategic call is worse than none.
+1. THE BIG ONE — most significant story, 2-3 sentences in <p> tags plus one
+   sharp line on what it means for asset managers.
+2. CAPITAL & FUNDING — debt costs, credit spreads, lending appetite,
+   refinancing conditions, capital raisings, fund launches, institutional and
+   offshore flows, cap rate direction. This is the CEO's section: give the
+   number and what it does to the cost of capital or the carrying value of a
+   book like theirs. Omit if there is genuinely nothing.
+3. TRANSACTIONS & DISPOSALS — $5 million+ (alternatives excepted).
+   Price, yield, vendor, purchaser, agent when reported.
+   Where a peer or competitor is involved, say what their STRATEGY appears to
+   be — rotating out of a sector, building scale, recycling capital — not just
+   that a deal happened.
+3b. ON THE MARKET — assets and portfolios newly launched, campaigns opening,
+   EOIs called, things listed for the first time in years. What is COMING to
+   market is as useful as what has sold: this reader buys and sells for a
+   living and wants to know what to look at. Include the agent and the price
+   expectation where reported.
+3c. BY THE NUMBERS — periodic research and benchmark releases (Property
+   Council office vacancy, JLL/CBRE/Knight Frank/Colliers/MSCI series, retail
+   turnover, industrial vacancy, cap rate surveys, construction costs). Lead
+   with the figure and the direction, not the publisher. A research release
+   reported without its numbers is worthless — omit it rather than describe it.
+4. LEASING DESK — rents, incentives, pre-commitments, expiries. Give the
+   benchmark a leasing manager could be held to.
+5. TENANT WATCH — frame the "so what" for a landlord. A retailer entering
+   administration belongs here even if none of their centres is named.
+6. OPERATIONS & COMPLIANCE — facilities, essential services, ESG/NABERS,
+   insurance, outgoings, land tax and capex. Lead with anything carrying a
+   deadline or a cost the reader has to plan for.
+7. CENTRE MARKETING — foot traffic, spend data, tenant-mix and repositioning.
+   Omit unless there is something concrete; one item max.
+8. ALTERNATIVES CORNER — childcare and aged care.
+9. PEOPLE MOVES
+10. PROPTECH BITE — one item max.'''
 
 # Who actually reads this. Every scoring decision hangs off these five jobs —
 # the test for any story is "does this change what this team does this week?"
@@ -252,6 +409,12 @@ def report_cost() -> None:
 
 def date_window():
     now = datetime.now(TIMEZONE)
+    if CADENCE == "weekly":
+        start = now - timedelta(days=7)
+        label = f"Week to {now.strftime('%A %d %B %Y')}"
+        window = (f"the last 7 days ({start.strftime('%A %d %B')} to "
+                  f"{now.strftime('%A %d %B %Y')}) Brisbane time")
+        return now, label, window, 7 * 24 + 4
     if now.weekday() == 0:  # Monday — weekend wrap
         start = now - timedelta(days=3)
         label = f"Weekend Wrap — {now.strftime('%A %d %B %Y')}"
@@ -274,7 +437,8 @@ def date_window():
 # ----------------------------------------------------------------------------
 # Pass 1 — research (allowlist-enforced web search)
 # ----------------------------------------------------------------------------
-def research_cluster(client, name: str, focus: str, window: str) -> list[dict]:
+def research_cluster(client, name: str, focus: str, window: str,
+                     date_resolver=None) -> list[dict]:
     prompt = f"""You are a research analyst for "{BRIEF_NAME}", a daily brief for the
 Head of Asset Management at a private Australian property group.
 
@@ -310,6 +474,8 @@ Your web search is technically restricted to an approved allowlist of
 reputable outlets — trade press, major mastheads, industry bodies, agency
 press rooms and the ASX. Work within it; do not attempt to reference
 anything outside it.
+
+{PORTFOLIO_BRIEF}
 
 WATCHLIST — findings involving any of these are top priority, tag them
 "watchlist": {json.dumps(CONFIG.get("watchlist", {}))}
@@ -409,16 +575,43 @@ markers."""
     if not isinstance(findings, list):
         return []
 
-    return gate_findings(name, findings)
+    return gate_findings(name, findings, date_resolver)
 
 
-def gate_findings(name: str, findings: list) -> list[dict]:
+def _parses(raw) -> bool:
+    try:
+        datetime.strptime(str(raw or "").strip()[:10], "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
+def gate_findings(name: str, findings: list, date_resolver=None) -> list[dict]:
     """Recency + relevance gate. Every research source goes through this.
 
     Grok gets no more trust than Anthropic does: same date validation, same
     threshold, same logging. Keeping this in one function is what guarantees
     that stays true as sources are added.
     """
+    # Before rejecting anything, give the findings worth the extra call a
+    # chance to be dated. Discarding an undated 9 is a real loss; discarding
+    # an undated 4 costs nothing.
+    if date_resolver:
+        worth_checking = [
+            f for f in findings
+            if isinstance(f, dict) and f.get("url") and not _parses(f.get("date_iso"))
+            and int(f.get("relevance", 0) or 0) >= DATE_RECHECK_MIN_RELEVANCE
+        ]
+        if worth_checking:
+            print(f"[info] {name}: re-checking dates for "
+                  f"{len(worth_checking)} high-value undated finding(s)")
+            resolved = date_resolver(worth_checking) or {}
+            for f in worth_checking:
+                if resolved.get(f["url"]):
+                    f["date_iso"] = resolved[f["url"]]
+                    f["date_source"] = "recheck"
+
+    limit = _age_limit(name)
     kept, dropped, stale = [], [], []
     today = datetime.now(TIMEZONE).date()
     for f in findings:
@@ -435,8 +628,8 @@ def gate_findings(name: str, findings: list) -> list[dict]:
         except ValueError:
             stale.append((f, "no verifiable date"))
             continue
-        if age > MAX_FINDING_AGE_DAYS or age < -1:
-            stale.append((f, f"published {raw} ({age}d old)"))
+        if age > limit or age < -1:
+            stale.append((f, f"published {raw} ({age}d old, limit {limit}d)"))
             continue
         f["age_days"] = age
 
@@ -479,12 +672,19 @@ def check_offlist_domains(findings: list[dict]) -> list[dict]:
     guarantee at the cost of losing sources you have not pre-approved.
     """
     approved = {d.lower().lstrip(".") for d in CONFIG.get("allowed_domains", [])}
+    blocked = {d.lower().lstrip(".") for d in CONFIG.get("blocked_domains", [])}
     enforce = bool(CONFIG.get("enforce_allowlist_for_grok", False))
     offlist, kept = [], []
     for f in findings:
         host = re.sub(r"^www\.", "",
                       re.sub(r"^https?://", "", str(f.get("url", "")).lower())
                       .split("/")[0])
+        # Hard block first — retail stock commentary never reaches the reader
+        # however well it scored.
+        if host and any(host == d or host.endswith("." + d) for d in blocked):
+            print(f"[info] blocked source {host}: "
+                  f"{str(f.get('headline',''))[:60]}", file=sys.stderr)
+            continue
         if host and not any(host == d or host.endswith("." + d)
                             for d in approved):
             offlist.append((host, f))
@@ -496,6 +696,50 @@ def check_offlist_domains(findings: list[dict]) -> list[dict]:
         verb = "DROPPED" if enforce else "allowed (not on the allowlist)"
         print(f"[info] {len(offlist)} finding(s) from off-allowlist domains "
               f"{verb}: {hosts}", file=sys.stderr)
+    return kept
+
+
+def drop_already_published(findings: list[dict], mem: dict) -> list[dict]:
+    """Enforce cross-edition de-duplication in code, not just in the prompt.
+
+    This is a DAILY email. Repeating a story is the fastest way to get it
+    ignored, and the editor-level "don't repeat" instruction cannot catch the
+    same deal written up by a second outlet under a different headline.
+
+    Two levels:
+      - Same URL already published  -> dropped outright, nothing new to say.
+      - Same story, different URL   -> kept but flagged, so the editor may only
+                                       run it as an explicit "Update:" carrying
+                                       genuinely new information.
+    """
+    seen_urls, seen_heads = brief_memory.published(mem)
+    kept, dropped, flagged = [], [], 0
+    for f in findings:
+        url = re.sub(r"^https?://(www\.)?", "",
+                     str(f.get("url", "")).lower()).rstrip("/")
+        if url and url in seen_urls:
+            dropped.append(f)
+            continue
+        head = f.get("headline", "")
+        if any(brief_memory.same_story(head, prev) for prev in seen_heads):
+            # Hard drop, not a flag. Flagging left it to the editor's
+            # discretion and it ran them anyway: a second outlet's write-up of
+            # the Cerberus/Lincoln Place auction reached a test edition the
+            # day after the first. Genuine follow-ups have their own channel —
+            # the DEAL TRACKER reports a tracked deal actually moving state,
+            # which is a fact we can verify rather than a judgement call.
+            flagged += 1
+            continue
+        kept.append(f)
+    if dropped:
+        print(f"[info] cross-edition dedup: dropped {len(dropped)} finding(s) "
+              f"already published", file=sys.stderr)
+        for f in dropped:
+            print(f"       repeat: {f.get('headline','')[:66]}", file=sys.stderr)
+    if flagged:
+        print(f"[info] cross-edition dedup: dropped {flagged} finding(s) "
+              f"re-reporting a story already run under a different URL",
+              file=sys.stderr)
     return kept
 
 
@@ -523,7 +767,7 @@ def merge_sources(*groups: list[dict]) -> list[dict]:
     return merged
 
 
-def run_research(client, window: str) -> list[dict]:
+def run_research(client, window: str, mem: dict) -> list[dict]:
     """Run every cluster in parallel, bounded by a hard wall-clock deadline.
 
     Streaming means a slow-but-alive response never trips the per-request
@@ -533,23 +777,56 @@ def run_research(client, window: str) -> list[dict]:
     """
     results: dict[str, list[dict]] = {n: [] for n in RESEARCH_CLUSTERS}
     pool = concurrent.futures.ThreadPoolExecutor(
-        max_workers=len(RESEARCH_CLUSTERS) + 1)
+        max_workers=len(RESEARCH_CLUSTERS) + 3)
+    # The date resolver is shared by every source. It was originally wired to
+    # the Grok passes only, which silently discarded undated findings from the
+    # Anthropic clusters however high they scored — including a childcare comp
+    # with a reported 4.72% yield, exactly what the trend engine needs.
+    xai = os.environ.get("XAI_API_KEY")
+    resolver = (lambda fs: grok_research.resolve_dates(xai, fs)) if xai else None
+
     futures = {
-        pool.submit(research_cluster, client, name, focus, window): name
+        pool.submit(research_cluster, client, name, focus, window, resolver): name
         for name, focus in RESEARCH_CLUSTERS.items()
     }
 
     # Grok runs alongside, covering the mastheads Anthropic's crawler is
     # blocked from (afr.com, theaustralian.com.au, smh.com.au and the rest).
     # Optional: no key, no Grok, and the edition still ships.
-    xai_key = os.environ.get("XAI_API_KEY")
+    xai_key = xai
     if xai_key:
         results["grok"] = []
         futures[pool.submit(
             lambda: gate_findings("grok", grok_research.research(
                 xai_key, window, AUDIENCE, RELEVANCE_RUBRIC, GEOGRAPHY,
-                CONFIG.get("watchlist", {}), DEAL_THRESHOLD))
+                CONFIG.get("watchlist", {}), DEAL_THRESHOLD,
+                PORTFOLIO_BRIEF, COVERAGE, BRIEF_DESC,
+                PRIORITY_SOURCES), resolver)
         )] = "grok"
+        # Dedicated comparables hunt. The general pass captures cap rates only
+        # incidentally (one usable comparable in twenty-one records), and the
+        # trend engine cannot produce a median without them.
+        # Comparables and market intelligence use a WIDER window than the news
+        # window. A transaction from five days ago is still a valid pricing
+        # data point, and a research release is still the current benchmark —
+        # neither ages the way a news story does. Measured: the 48h window
+        # returned 0 comparables, the 76h window returned 3.
+        wide = (f"the last {MAX_FINDING_AGE_DAYS} days "
+                f"(the gate rejects anything older, so this is the full "
+                f"usable range)")
+        if ENABLE_COMPARABLES:
+            results["grok_comps"] = []
+            futures[pool.submit(
+                lambda: gate_findings("grok_comps", grok_research.comparables(
+                    xai_key, wide, GEOGRAPHY, DEAL_THRESHOLD), resolver)
+            )] = "grok_comps"
+
+        results["grok_intel"] = []
+        futures[pool.submit(
+            lambda: gate_findings("grok_intel", grok_research.market_intelligence(
+                xai_key, wide, GEOGRAPHY, CONFIG.get("watchlist", {}),
+                INTEL_CATEGORIES), resolver)
+        )] = "grok_intel"
     else:
         print("[info] XAI_API_KEY not set — skipping Grok research pass "
               "(the mastheads will be missing)", file=sys.stderr)
@@ -572,7 +849,8 @@ def run_research(client, window: str) -> list[dict]:
     finally:
         # Don't block the edition waiting on threads we've already given up on.
         pool.shutdown(wait=False)
-    return check_offlist_domains(merge_sources(*results.values()))
+    merged = check_offlist_domains(merge_sources(*results.values()))
+    return drop_already_published(merged, mem)
 
 
 # ----------------------------------------------------------------------------
@@ -635,7 +913,10 @@ ASX PRICE-SENSITIVE ANNOUNCEMENTS (already rendered as their own section in
 the email — do NOT create a section for them, but weave any that matter into
 your narrative, e.g. if a REIT announced a divestment, that can be The Big
 One, linking the announcement URL).
-Each carries a "company" name alongside its "code": ALWAYS write the company
+Each carries a "company" name and often a "why_relevant" note explaining
+its place in the industry — use that context when you weave it in, don't
+assume the reader knows the ticker.
+ALWAYS write the company
 name on first mention, with the ticker in brackets — "Centuria Industrial
 REIT (CIP)", never a bare "CIP". The reader should not have to decode ticker
 symbols. Use the bare code only on later mentions in the same item:
@@ -655,8 +936,14 @@ in THE STRATEGIC READ where they support a point. Quote them exactly as given;
 never recompute, extrapolate or round them differently:
 {trend_summary}
 
-ALREADY COVERED in the last 14 days — do not repeat unless there is a NEW
-development, in which case frame it explicitly as an update ("Update: ..."):
+ALREADY COVERED — this is a DAILY email and repeating yourself is the fastest
+way to lose the reader. Findings whose URL was already published have been
+removed in code before reaching you. Findings re-reporting an already-published story under a different URL have
+also been removed. So everything you have been given is genuinely unpublished:
+do not hedge it with "as reported earlier" or "we noted last week".
+The one legitimate way to revisit a story is the DEAL TRACKER below, where a
+tracked deal has verifiably changed state — lead those with "Tracked: ".
+Recent headlines, for context only — do NOT re-report these:
 {json.dumps(recent)}
 
 DEAL TRACKER — deals previously reported as on-market / under LOI / in due
@@ -664,39 +951,21 @@ diligence. If today's findings resolve or move any of them, report it as a
 tracked update ("Tracked: ..."). If nothing moved, stay silent on them:
 {json.dumps(tracker)}
 
-SECTIONS, in order. OMIT any section with no genuine news — do not pad it with
-a placeholder line. Only if the entire edition is thin, say so once at the top
-in a wry sentence:
-0. THE STRATEGIC READ — 3-4 sentences, in <p> tags, written for the CEO/COO.
-   Not a summary of what follows. Answer: given today's flow, what should this
-   group be doing with capital — buying, selling, holding, refinancing, or
-   watching? Name the evidence you are reasoning from. If the day's findings
-   genuinely don't support a strategic view, say so in one line rather than
-   manufacturing one — a fabricated strategic call is worse than none.
-1. THE BIG ONE — most significant story, 2-3 sentences in <p> tags plus one
-   sharp line on what it means for asset managers.
-2. CAPITAL & FUNDING — debt costs, credit spreads, lending appetite,
-   refinancing conditions, capital raisings, fund launches, institutional and
-   offshore flows, cap rate direction. This is the CEO's section: give the
-   number and what it does to the cost of capital or the carrying value of a
-   book like theirs. Omit if there is genuinely nothing.
-3. TRANSACTIONS & DISPOSALS — {DEAL_THRESHOLD}+ (alternatives excepted).
-   Price, yield, vendor, purchaser, agent when reported.
-   Where a peer or competitor is involved, say what their STRATEGY appears to
-   be — rotating out of a sector, building scale, recycling capital — not just
-   that a deal happened.
-4. LEASING DESK — rents, incentives, pre-commitments, expiries. Give the
-   benchmark a leasing manager could be held to.
-5. TENANT WATCH — frame the "so what" for a landlord. A retailer entering
-   administration belongs here even if none of their centres is named.
-6. OPERATIONS & COMPLIANCE — facilities, essential services, ESG/NABERS,
-   insurance, outgoings, land tax and capex. Lead with anything carrying a
-   deadline or a cost the reader has to plan for.
-7. CENTRE MARKETING — foot traffic, spend data, tenant-mix and repositioning.
-   Omit unless there is something concrete; one item max.
-8. ALTERNATIVES CORNER — childcare and aged care.
-9. PEOPLE MOVES
-10. PROPTECH BITE — one item max.{friday_block}
+{SECTION_PLAN}{friday_block}
+
+NO REPETITION ACROSS SECTIONS — this is the most common failure of this brief.
+Each story, company and asset belongs in ONE section only. If Centuria's
+results are the Big One, they do not also appear in Capital & Funding, the
+Leasing Desk and On The Horizon. Pick the single section where the item lands
+hardest and leave it there. THE STRATEGIC READ may reference an item covered
+below, but only to make a capital-allocation point — never to retell it.
+A reader should not meet the same company four times in one email.
+
+BREADTH BEATS DEPTH ON ONE NAME. If a single ASX deep-read has produced five
+detailed insights and the web findings are thinner, resist the pull to build
+the edition around that one company: use its two best insights and give the
+remaining space to other stories. An edition covering eight companies lightly
+is more useful than one covering two companies exhaustively.
 
 TONE: entertaining but credible — a well-read colleague with a dry sense of
 humour, not a press release. Punchy. One-liners welcome. Never mocking about
@@ -800,6 +1069,12 @@ def render_asx_section(items: list[dict]) -> str:
         label = (f'{html_escape(company)} '
                  f'<span style="color:#666;">({html_escape(i["code"])})</span>'
                  if company else f'{html_escape(i["code"])}')
+        # Why this company matters to the reader's industry. Without it an
+        # unfamiliar ticker is just noise — "Bailador Technology Investments"
+        # tells a franchise reader nothing on its own.
+        note = TICKER_NOTES.get(i.get("code", ""), "")
+        note_html = (f'<div style="color:#666;font-size:13px;margin:2px 0 0 0;">'
+                     f'{html_escape(note)}</div>') if note else ""
         lis.append(
             f'<li><strong>{label}</strong> — '
             f'{html_escape(i["header"])} '
@@ -807,7 +1082,7 @@ def render_asx_section(items: list[dict]) -> str:
             f'({html_escape(i["released"])})</span> '
             f'<a href="{html_escape(i["url"], quote=True)}">PDF</a> · '
             f'<a href="{html_escape(i["page_url"], quote=True)}">ASX page</a>'
-            f'{insight_html}</li>'
+            f'{note_html}{insight_html}</li>'
         )
     lis = "".join(lis)
     return f"<h2>ASX PRICE-SENSITIVE</h2><ul>{lis}</ul>"
@@ -970,13 +1245,19 @@ def render_email(body: str, shitpost: str, label: str,
 # ----------------------------------------------------------------------------
 # Persistence & delivery
 # ----------------------------------------------------------------------------
+def _prefix() -> str:
+    """Editions share docs/ but must not overwrite each other's archives."""
+    return f"{EDITION}-" if EDITION else ""
+
+
 def archive_edition(html: str, date_iso: str) -> None:
     docs = os.path.join(ROOT, "docs")
     os.makedirs(docs, exist_ok=True)
-    with open(os.path.join(docs, f"{date_iso}.html"), "w") as f:
+    with open(os.path.join(docs, f"{_prefix()}{date_iso}.html"), "w") as f:
         f.write(html)
     editions = sorted(
-        (f for f in os.listdir(docs) if re.match(r"\d{4}-\d{2}-\d{2}\.html$", f)),
+        (f for f in os.listdir(docs)
+         if re.match(rf"{re.escape(_prefix())}\d{{4}}-\d{{2}}-\d{{2}}\.html$", f)),
         reverse=True,
     )
     links = "".join(
@@ -1011,12 +1292,14 @@ def send_email(subject: str, html: str) -> None:
     print(f"Sent '{subject}' to {len(recipients)} recipient(s)")
 
 
-def main() -> None:
+def main(config_path: str | None = None, **overrides) -> None:
+    if config_path or not CONFIG:
+        configure(config_path or CONFIG_PATH, **overrides)
     now, label, window, lookback_hours = date_window()
     is_friday = now.weekday() == 4
     print(f"Generating {BRIEF_NAME} for {label} ...")
 
-    mem = brief_memory.load()
+    mem = brief_memory.load(MEMORY_PATH)
     since = now - timedelta(hours=lookback_hours)
 
     print("Fetching ASX price-sensitive announcements ...")
@@ -1037,7 +1320,7 @@ def main() -> None:
 
     print(f"Research pass ({len(RESEARCH_CLUSTERS)} clusters, "
           f"allowlist-enforced) ...")
-    findings = run_research(client, window)
+    findings = run_research(client, window, mem)
 
     trends = portfolio_trends.compute(mem, now)
     print(f"Trend database: {trends['total_tracked']} transactions tracked, "
@@ -1061,7 +1344,8 @@ def main() -> None:
         forward_calendar.pending_results(CONFIG.get("asx_tickers", [])),
         brief_memory.open_deals(mem),
     )
-    signals_html = render_signals_strip(market_signals.collect())
+    signals_html = (render_signals_strip(market_signals.collect())
+                    if SHOW_MARKET_SIGNALS else "")
     shitpost = get_shitpost()
     html = render_email(body, shitpost, label, signals_html)
 
@@ -1073,7 +1357,7 @@ def main() -> None:
         return
 
     date_iso = now.strftime("%Y-%m-%d")
-    if os.path.exists(os.path.join(ROOT, "docs", f"{date_iso}.html")) \
+    if os.path.exists(os.path.join(ROOT, "docs", f"{_prefix()}{date_iso}.html")) \
             and not os.environ.get("FORCE_SEND"):
         print(f"An edition for {date_iso} already exists — not sending twice. "
               f"Set FORCE_SEND=1 to override.", file=sys.stderr)
@@ -1082,7 +1366,7 @@ def main() -> None:
     send_email(subject, html)
     archive_edition(html, date_iso)
     brief_memory.append(mem, records, date_iso)
-    brief_memory.save(mem)
+    brief_memory.save(mem, MEMORY_PATH)
     print(f"Archived edition and logged {len(records)} records to memory.")
     report_cost()
 

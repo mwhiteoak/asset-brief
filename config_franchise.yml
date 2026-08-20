@@ -1,0 +1,210 @@
+# ============================================================================
+# The Franchise Brief — WEEKLY edition configuration
+#
+# Different beat, different rhythm. Franchise news moves in reporting cycles,
+# disclosure-document updates, network announcements and deal processes rather
+# than daily transactions — so this runs once a week over a 7-day window.
+# ============================================================================
+
+brief_name: The Franchise Brief
+edition: franchise      # separate memory store and archive prefix
+cadence: weekly         # 7-day window
+
+# ----------------------------------------------------------------------------
+# ASX TICKERS — the listed franchise universe. Validated against the ASX API
+# in Aug 2026; McGrath (MEA), Reject Shop (TRS) and ABC were dropped because
+# they have been taken private or delisted.
+# ----------------------------------------------------------------------------
+asx_tickers:
+  # Franchisors — they franchise their own brands
+  - DMP   # Domino's Pizza Enterprises
+  - RFG   # Retail Food Group (Donut King, Gloria Jean's, Brumby's, Crust)
+  - GYG   # Guzman y Gomez
+  - HVN   # Harvey Norman (Australian complexes are franchised)
+  - SIG   # Sigma Healthcare / Chemist Warehouse
+  - CCV   # Cash Converters
+  - JYC   # Joyce Corporation (Bedshed)
+  - KME   # Kip McGrath Education Centres
+  - OLI   # Oliver's Real Food
+  # Large franchisees and multi-site operators
+  - CKF   # Collins Foods (KFC, Taco Bell franchisee)
+  - APE   # Eagers Automotive (dealership networks)
+  - VVA   # Viva Leisure (Club Lime)
+  - SSG   # Shaver Shop
+  # Franchise-adjacent networks, suppliers and channel owners
+  - BAP   # Bapcor (Autobarn, Midas)
+  - AX1   # Accent Group
+  - MHJ   # Michael Hill
+  - LOV   # Lovisa
+  - AFG   # Australian Finance Group (mortgage broking network)
+  - ALD   # Ampol (franchised fuel/convenience sites)
+  - VEA   # Viva Energy (OTR, Coles Express)
+  - BLX   # Beacon Lighting
+  - MTS   # Metcash (IGA, Mitre 10, Total Tools banner groups)
+  - ADH   # Adairs
+  - UNI   # Universal Store
+  # Majors whose store-network decisions move the franchise market
+  - WES   # Wesfarmers
+  - COL   # Coles
+  - WOW   # Woolworths
+  - EDV   # Endeavour Group
+  # Listed investors that hold multi-site consumer businesses
+  - SOL   # Washington H. Soul Pattinson
+  - MAF   # MA Financial
+  - RPL   # Regal Partners
+  - BTI   # Bailador Technology Investments
+  - TOP   # Thorney Opportunities
+
+# ----------------------------------------------------------------------------
+# TICKER NOTES — why each listed company matters to franchising. Rendered
+# beside the code in the ASX section, because "Bailador Technology
+# Investments (BTI)" tells a franchise reader nothing on its own.
+# ----------------------------------------------------------------------------
+ticker_notes:
+  DMP: "Domino's — largest pizza franchisor, ~700 AU/NZ stores"
+  RFG: "Retail Food Group — Donut King, Gloria Jean's, Brumby's, Crust; ~700 AU outlets"
+  GYG: "Guzman y Gomez — fast-growing QSR franchisor, ~250 restaurants"
+  HVN: "Harvey Norman — AU complexes run on a franchise model, ~195 franchisees"
+  SIG: "Sigma/Chemist Warehouse — ~880 franchised pharmacies, largest pharmacy franchisor"
+  CCV: "Cash Converters — ~650 stores globally, mixed corporate and franchise"
+  JYC: "Joyce Corp — Bedshed bedding franchise, ~42 stores"
+  KME: "Kip McGrath — tutoring franchise, ~430 centres ANZ/UK"
+  OLI: "Oliver's Real Food — highway QSR, small franchised network"
+  CKF: "Collins Foods — Australia's largest KFC franchisee, plus Taco Bell"
+  APE: "Eagers Automotive — largest dealership network, franchise-model motor retail"
+  VVA: "Viva Leisure — Club Lime gyms, corporate plus franchised sites"
+  SSG: "Shaver Shop — specialty retail, franchises largely bought back"
+  BAP: "Bapcor — Autobarn and Midas franchise networks"
+  AX1: "Accent Group — footwear retail and distribution, franchised banners"
+  MHJ: "Michael Hill — jewellery retail with franchised stores"
+  LOV: "Lovisa — accessories, franchise/partner model in offshore markets"
+  AFG: "Australian Finance Group — mortgage broking franchise network"
+  ALD: "Ampol — franchised fuel and convenience sites"
+  VEA: "Viva Energy — OTR and Coles Express convenience network"
+  BLX: "Beacon Lighting — lighting retail with franchised stores"
+  MTS: "Metcash — IGA, Mitre 10 and Total Tools banner groups"
+  ADH: "Adairs — homewares retail, national store network"
+  UNI: "Universal Store — youth apparel, national network"
+  WES: "Wesfarmers — Bunnings, Kmart, Officeworks; sets the retail site benchmark"
+  COL: "Coles — supermarket anchor, Coles Express franchise history"
+  WOW: "Woolworths — supermarket anchor, major centre tenant"
+  EDV: "Endeavour — BWS and Dan Murphy's, franchised liquor banners"
+  SOL: "Soul Pattinson — listed investor, holds multi-site consumer businesses"
+  MAF: "MA Financial — asset manager, invests in consumer and hospitality"
+  RPL: "Regal Partners — listed fund manager, small/mid-cap consumer exposure"
+  BTI: "Bailador — listed VC, backs growth-stage multi-site and tech businesses"
+  TOP: "Thorney Opportunities — listed investor in small-cap consumer names"
+
+# Franchise readers do not price assets off the cash rate — the property
+# brief's RBA/bond/A-REIT strip is noise here.
+show_market_signals: false
+
+# ----------------------------------------------------------------------------
+# WATCHLIST — the names that make a story lead.
+# ----------------------------------------------------------------------------
+watchlist:
+  # Franchise brands whose network moves matter to landlords and investors
+  brands:
+    - Domino's
+    - Guzman y Gomez
+    - Zambrero
+    - Grill'd
+    - Boost Juice
+    - Red Rooster
+    - Oporto
+    - Chicken Treat
+    - Chemist Warehouse
+    - Anytime Fitness
+    - F45
+    - Jetts
+    - Snap Fitness
+    - Bakers Delight
+    - Michel's Patisserie
+    - Poolwerx
+    - Jim's Group
+    - Ray White
+    - LJ Hooker
+    - Harcourts
+    - 7-Eleven
+    - Subway
+    - McDonald's
+    - KFC
+    - Zarraffa's
+  # Private equity and VC active in Australian franchise / multi-site consumer
+  investors:
+    - PAG
+    - Quadrant Private Equity
+    - Pacific Equity Partners
+    - Adamantem Capital
+    - Anchorage Capital Partners
+    - Allegro Funds
+    - BGH Capital
+    - Next Capital
+    - Advent Partners
+    - Mercury Capital
+    - Colinton Capital
+    - Potentia Capital
+    - TPG
+    - KKR
+    - Bain Capital
+  # Regulators and bodies that shape the sector
+  regulators:
+    - ACCC
+    - Franchise Council of Australia
+    - Fair Work Ombudsman
+    - ASBFEO
+  own_group:
+    - Clarence Property
+
+# ----------------------------------------------------------------------------
+# SOURCE ALLOWLIST — for the Anthropic passes only. Grok searches the open web.
+# ----------------------------------------------------------------------------
+# Verified blocked to Anthropic's crawler (do not re-add): qsrmedia.com.au.
+# Grok still reaches it — it stays in PRIORITY_SOURCES in franchise_brief.py.
+allowed_domains:
+  - insideretail.com.au
+  - insidefmcg.com.au
+  - hospitalitymagazine.com.au
+  - ragtrader.com.au
+  - franchisebusiness.com.au
+  - insidesmallbusiness.com.au
+  - smartcompany.com.au
+  - businessnewsaustralia.com
+  - startupdaily.net
+  - accc.gov.au
+  - franchise.org.au
+  - asbfeo.gov.au
+  - fairwork.gov.au
+  - shoppingcentrenews.com.au
+  - realcommercial.com.au
+  - commercialrealestate.com.au
+  - theurbandeveloper.com
+  - australianpropertyjournal.com.au
+
+blocked_domains:
+  - fool.com.au
+  - motleyfool.com.au
+  - marketindex.com.au
+  - hotcopper.com.au
+  - simplywall.st
+
+enforce_allowlist_for_grok: false
+min_relevance: 5
+# Weekly cadence, so the window is 7 days and findings may be a little older
+# than the daily tolerates without being stale to a weekly reader.
+max_finding_age_days: 12
+date_recheck_min_relevance: 7
+portfolio: []
+rba_meeting_dates:
+  - 2026-09-15
+  - 2026-11-03
+  - 2026-12-08
+
+# No cap rates in franchising — the comparables hunt is property-only.
+enable_comparables: false
+
+# A weekly reader has seen nothing for 7 days, and regulatory, court and
+# enforcement stories surface slowly. A 12-day ceiling threw away an ACCC
+# penalty against a watchlist franchisor and a $35m Harvey Norman fine.
+max_finding_age_days: 21
+max_intel_age_days: 45
