@@ -150,6 +150,68 @@ all while the database is thin. This is the one thing a competitor cannot get
 by subscribing to the same newsletters — and it only builds if editions run
 daily, so start it early.
 
+## What's in the watchlists
+
+Shown here so you can see the shape of a working config before you open the
+YAML. **These are one group's actual settings, not sensible defaults** —
+every entry is there because it matters to that specific book. Replace them
+with yours; the lists are what every relevance score is measured against.
+
+### `config.yml` — The Asset Brief (property)
+
+| Key | Entries | What it does |
+|---|---|---|
+| `tenants` | Coles · Woolworths · Chemist Warehouse · Best & Less · Goodstart Early Learning · G8 Education | Anchor and major tenants. One of these entering administration outranks a $100m deal elsewhere. |
+| `competitors` | Sentinel Property Group · RAM (Real Asset Management) · Precision Group · Fawkner Property · Forza Capital · Marquette Properties | Peer groups whose deals and strategy get tracked and framed strategically, not just reported. |
+| `markets` | Toowoomba · Townsville · Casuarina | Suburbs and precincts owned or watched. A centre trading here is a direct valuation comparable. |
+| `own_group` | Clarence Property | **You.** Flagged like the watchlist, but the editor is told this is the reader's own organisation so it never writes about them as a rival. |
+| `agents` | *(empty)* | Selling and leasing agents whose campaigns you follow. |
+| `portfolio` | *(empty)* | Your actual assets — see below. |
+
+Plus **48 ASX tickers**: A-REITs and fund managers (GMG, SCG, VCX, DXS, GPT,
+MGR, SGP, CHC, CQR, CQE, RGN, HMC, HDN, ARF, CNI, CIP, COF, BWP, WPR, ABG,
+LLC, CLW, CDP, GOZ, DXI, CMW, GDI, HCW, INA, LIC, QAL), major retail and
+food tenants (COL, WOW, WES, JBH, HVN, SUL, PMV, MYR, LOV, NCK, AX1, BBN,
+DMP, CKF, GYG), and childcare/aged care operators (GEM, REG).
+
+### `config_franchise.yml` — The Franchise Brief
+
+| Key | Entries |
+|---|---|
+| `brands` | Domino's · Guzman y Gomez · Zambrero · Grill'd · Boost Juice · Red Rooster · Oporto · Chicken Treat · Chemist Warehouse · Anytime Fitness · F45 · Jetts · Snap Fitness · Bakers Delight · Michel's Patisserie · Poolwerx · Jim's Group · Ray White · LJ Hooker · Harcourts · 7-Eleven · Subway · McDonald's · KFC · Zarraffa's |
+| `investors` | PAG · Quadrant Private Equity · Pacific Equity Partners · Adamantem Capital · Anchorage Capital Partners · Allegro Funds · BGH Capital · Next Capital · Advent Partners · Mercury Capital · Colinton Capital · Potentia Capital · TPG · KKR · Bain Capital |
+| `regulators` | ACCC · Franchise Council of Australia · Fair Work Ombudsman · ASBFEO |
+
+Plus **33 ASX tickers**, each with a `ticker_notes` entry explaining why it
+matters — franchisors (DMP, RFG, GYG, HVN, SIG, CCV, JYC, KME, OLI), large
+franchisees and multi-site operators (CKF, APE, VVA, SSG), franchise-adjacent
+networks (BAP, AX1, MHJ, LOV, AFG, ALD, VEA, BLX, MTS, ADH, UNI), the majors
+whose site decisions move the market (WES, COL, WOW, EDV), and listed
+investors (SOL, MAF, RPL, BTI, TOP).
+
+Two that are easy to miss: **Harvey Norman's Australian complexes run on a
+franchise model**, and **Sigma post-Chemist Warehouse merger** is one of the
+country's largest franchisors. Neither shows up on a naive "franchise" screen.
+
+### The one that starts empty
+
+`portfolio` is the highest-leverage field in either file and ships blank:
+
+```yaml
+portfolio:
+  - asset: Casuarina Square
+    sector: retail
+    suburb: Casuarina
+    state: NSW
+    anchors: [Coles, Kmart]
+    notes: 12,000sqm neighbourhood centre; major expiry FY28
+```
+
+Fill it in and every research pass stops asking "is this important?" and
+starts asking "does this touch an asset we own?" — a competing centre trading
+two suburbs away is a direct comparable for your valuation, and your anchor
+tenant's network plans are your income risk.
+
 ## The control panels: `config.yml` and `config_franchise.yml`
 
 - **`portfolio`** — *the highest-leverage field in the file, and it starts
