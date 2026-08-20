@@ -48,19 +48,75 @@ allocation, and an operational layer for the team running the assets.
 10. **Send and persist** — emailed via Gmail; archived to `docs/`, deal log
     appended to `data/memory_*.json`, both committed back by the workflow.
 
-## The trend engine
+## Setting it up for yourself
 
-`data/memory_*.json` accumulates every transaction the brief records — asset,
-sector, state, price, yield, buyer type, agent. `portfolio_trends.py` computes
-medians and cohort movement from it in plain Python:
+This repo is configured for one specific Australian property group. The
+watchlists, markets and tickers are a **worked example, not a default** —
+treat replacing them as step one, not a later refinement. The brief is only
+as useful as the config, because that is what every relevance score is
+measured against.
 
-> *Retail: median 6.05% across 4 deals (−45bps vs prior cohort)*
+**1. Take your own copy.** Fork it, or clone and push to a new private repo.
+Keep it private: `data/memory_*.json` becomes a proprietary comparables
+database, and the config names the tenants and competitors you care about.
 
-It refuses to publish a median under three data points and renders nothing at
-all while the database is thin. This is the one thing a competitor cannot get
-by subscribing to the same newsletters — and it only builds if editions run
-daily, so start it early.
+**2. Get three credentials.**
 
+| Need | Where | Notes |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) | Add credit — this is not a free tier workload |
+| `XAI_API_KEY` | [console.x.ai](https://console.x.ai) | Not optional in practice: without it you lose every major masthead (see Known limits) |
+| Gmail app password | [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) | Requires 2-Step Verification on the account first |
+
+**3. Make the config yours.** In `config.yml`:
+- `watchlist` — your tenants, your competitors, your markets, and `own_group`
+  set to your own organisation so the brief doesn't write about you as a rival.
+- `portfolio` — your actual assets. It ships empty, and filling it in is the
+  single biggest quality difference available: it shifts scoring from "is this
+  important?" to "does this touch something we own?"
+- `asx_tickers` — **verify every code against the ASX API before adding it.**
+  A delisted or wrong code returns HTTP 400 and is skipped with a warning, so
+  it fails silently forever. Two of the original tickers were dead for months.
+- `allowed_domains` — your trade press. Check the run log after adding one;
+  a domain that blocks Anthropic's crawler makes the API reject the whole
+  request, and the code will tell you which to remove.
+
+Do the same in `config_franchise.yml`, or delete that edition and its workflow
+if you only want the daily.
+
+**4. Run it locally before scheduling it.**
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env        # fill in; .env is gitignored
+DRY_RUN=1 python editions.py property
+```
+
+That writes `brief_preview.html` and sends nothing. Read it. Then check the
+run log: every dropped finding is printed with its relevance score, and every
+stale one with its age. That log is how you tune `min_relevance` — from
+evidence, not guesswork.
+
+**5. Add the five repo secrets** (Settings → Secrets and variables → Actions):
+`ANTHROPIC_API_KEY`, `XAI_API_KEY`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`,
+`RECIPIENT_EMAIL` (comma-separated; all recipients are BCC'd).
+
+**6. Test the workflow, then let it run.**
+
+```bash
+gh workflow run "Daily Asset Brief" -f dry_run=true
+```
+
+Download the artifact and check it. Then run it once for real. The cron takes
+over from there — 5:30am AEST weekdays, and Thursday 6:30am for the franchise
+weekly. Times are Brisbane-based (no DST); if your readers are in Sydney or
+Melbourne the arrival time drifts by an hour for half the year.
+
+**What to expect in the first fortnight.** The trend table renders nothing
+until it has three transactions with yields in a single sector, so it will be
+absent at first and that is correct — it refuses to publish a median off thin
+data. Yield varies run to run; a quiet week produces a short brief. Both are
+working as intended.
 ## Running it
 
 ```bash
@@ -74,13 +130,25 @@ python editions.py all         # both in sequence
 
 `DRY_RUN=1` writes `brief_preview.html` and sends nothing. A second real send
 on the same day is refused unless `FORCE_SEND=1`, so a re-run can't double-mail.
-
 ## Adding an edition
 
 Editions are one function each in `editions.py`. The pipeline in
 `daily_brief.py` is edition-agnostic; an edition supplies only its editorial
 position — audience, relevance rubric, research clusters, section order — plus
 a config file. `franchise_content.py` is the worked example.
+
+## The trend engine
+
+`data/memory_*.json` accumulates every transaction the brief records — asset,
+sector, state, price, yield, buyer type, agent. `portfolio_trends.py` computes
+medians and cohort movement from it in plain Python:
+
+> *Retail: median 6.05% across 4 deals (−45bps vs prior cohort)*
+
+It refuses to publish a median under three data points and renders nothing at
+all while the database is thin. This is the one thing a competitor cannot get
+by subscribing to the same newsletters — and it only builds if editions run
+daily, so start it early.
 
 ## The control panels: `config.yml` and `config_franchise.yml`
 
