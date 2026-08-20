@@ -153,8 +153,7 @@ watchlist:
     - Franchise Council of Australia
     - Fair Work Ombudsman
     - ASBFEO
-  own_group:
-    - Clarence Property
+  own_group: []
 
 # ----------------------------------------------------------------------------
 # SOURCE ALLOWLIST — for the Anthropic passes only. Grok searches the open web.

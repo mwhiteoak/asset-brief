@@ -74,16 +74,16 @@ allowed_domains:
 # omit anything commercially sensitive. Even just names and suburbs helps.
 #
 # portfolio:
-#   - asset: Casuarina Square
+#   - asset: Example Central
 #     sector: retail
-#     suburb: Casuarina
-#     state: NSW
+#     suburb: Springfield
+#     state: QLD
 #     anchors: [Coles, Kmart]
 #     notes: 12,000sqm neighbourhood centre; major expiry FY28
-#   - asset: Toowoomba industrial estate
+#   - asset: Example industrial estate
 #     sector: industrial
-#     suburb: Toowoomba
-#     state: QLD
+#     suburb: Wetherill Park
+#     state: NSW
 #     anchors: []
 #     notes: 3 tenancies, WALE 4.2yrs
 # ----------------------------------------------------------------------------
@@ -142,8 +142,8 @@ rba_meeting_dates:
 # EDIT THESE to your actual portfolio, tenant roster and competitor set.
 # ----------------------------------------------------------------------------
 watchlist:
-  # Tenants across your assets — administrations, rollouts, closures involving
-  # these become lead items
+  # Tenants across your assets — administrations, rollouts and closures
+  # involving these become lead items.
   tenants:
     - Coles
     - Woolworths
@@ -151,29 +151,42 @@ watchlist:
     - Best & Less
     - Goodstart Early Learning
     - G8 Education
-  # Your own group — mentions get flagged, but the editor is told this is you,
-  # not a rival, so it doesn't write about your own deals in competitor framing.
-  own_group:
-    - 
-  # Competitors and peers whose deals you track
+  # Peer groups and competitors whose deals and strategy you track. Their
+  # transactions are reported with a read on what they appear to be doing,
+  # not just that a deal happened.
   competitors:
     - Sentinel Property Group
+    - Clarence Property
+    - Marquette Properties
     - RAM (Real Asset Management)
     - Precision Group
     - Fawkner Property
     - Forza Capital
-    - Marquette Properties
-    - Clarence Property
-  # Suburbs / precincts / named assets you own or are watching
+    - Elanor Investors Group
+    - Newmark Capital
+    - Barwon Investment Partners
+    - Trilogy Funds
+    - Alceon
+    - Pelligra Group
+    - Salta Properties
+    - Impact Investment Group
+  # Markets you own in or are watching. Keep these broad enough to catch
+  # nearby comparables — a centre trading in the same region is a valuation
+  # datapoint even when it is not your suburb.
   markets:
-    - Toowoomba
-    - Townsville
-    - Brisbane
+    - Brisbane metro
     - Gold Coast
-    -Sydney
-    
-  # Agents whose campaigns you follow
+    - Sunshine Coast
+    - Regional Queensland
+    - Northern Rivers NSW
+    - Western Sydney
+    - Newcastle and Hunter
+  # Agents whose campaigns you follow.
   agents: []
+  # YOUR OWN organisation. Anything naming these is flagged, but the editor
+  # is told this is the reader — so it never writes about you as a rival or
+  # explains your own deals back to you. Leave blank if not needed.
+  own_group: []
 
 # ----------------------------------------------------------------------------
 # ASX TICKERS — price-sensitive announcements are pulled directly from the

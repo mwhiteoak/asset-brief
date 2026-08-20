@@ -1,7 +1,8 @@
 # The Brief
 
-Two automated intelligence emails for a private Australian property group,
-built on one pipeline.
+Two automated intelligence emails for an Australian property group, built on
+one pipeline. Point the config at your own tenants, competitors and markets
+and it becomes your brief.
 
 | Edition | Cadence | Covers |
 |---|---|---|
@@ -50,11 +51,10 @@ allocation, and an operational layer for the team running the assets.
 
 ## Setting it up for yourself
 
-This repo is configured for one specific Australian property group. The
-watchlists, markets and tickers are a **worked example, not a default** —
-treat replacing them as step one, not a later refinement. The brief is only
-as useful as the config, because that is what every relevance score is
-measured against.
+The repo ships with a realistic Australian commercial property configuration
+as a starting point. **Replacing the watchlist is step one, not a later
+refinement** — it is what every relevance score is measured against, so the
+brief is only as useful as the names in it.
 
 **1. Take your own copy.** Fork it, or clone and push to a new private repo.
 Keep it private: `data/memory_*.json` becomes a proprietary comparables
@@ -152,46 +152,51 @@ daily, so start it early.
 
 ## What's in the watchlists
 
-Shown here so you can see the shape of a working config before you open the
-YAML. **These are one group's actual settings, not sensible defaults** —
-every entry is there because it matters to that specific book. Replace them
-with yours; the lists are what every relevance score is measured against.
+The watchlist is what turns a news feed into *your* news feed: anything
+matching it gets a ⚑ WATCHLIST flag, priority placement and a higher relevance
+score. Shipped populated with a realistic Australian commercial property
+example so you can see the shape before editing — swap in your own names.
 
 ### `config.yml` — The Asset Brief (property)
 
-| Key | Entries | What it does |
+| Key | Ships with | What it does |
 |---|---|---|
 | `tenants` | Coles · Woolworths · Chemist Warehouse · Best & Less · Goodstart Early Learning · G8 Education | Anchor and major tenants. One of these entering administration outranks a $100m deal elsewhere. |
-| `competitors` | Sentinel Property Group · RAM (Real Asset Management) · Precision Group · Fawkner Property · Forza Capital · Marquette Properties | Peer groups whose deals and strategy get tracked and framed strategically, not just reported. |
-| `markets` | Toowoomba · Townsville · Casuarina | Suburbs and precincts owned or watched. A centre trading here is a direct valuation comparable. |
-| `own_group` | Clarence Property | **You.** Flagged like the watchlist, but the editor is told this is the reader's own organisation so it never writes about them as a rival. |
+| `competitors` | 15 Australian groups — Sentinel, Clarence Property, Marquette, RAM, Precision, Fawkner, Forza, Elanor, Newmark, Barwon, Trilogy, Alceon, Pelligra, Salta, Impact Investment Group | Peer groups whose deals get a read on what they appear to be *doing* — rotating out of a sector, building scale, recycling capital — not just that a deal happened. |
+| `markets` | Brisbane metro · Gold Coast · Sunshine Coast · Regional Queensland · Northern Rivers NSW · Western Sydney · Newcastle and Hunter | Regions you own in or watch. Keep these broad: a centre trading in the same region is a valuation datapoint even when it isn't your suburb. |
 | `agents` | *(empty)* | Selling and leasing agents whose campaigns you follow. |
+| `own_group` | *(empty)* | **You.** Flagged like the watchlist, but the editor is told this is the reader — so it never writes about you as a rival or explains your own deals back to you. |
 | `portfolio` | *(empty)* | Your actual assets — see below. |
 
-Plus **48 ASX tickers**: A-REITs and fund managers (GMG, SCG, VCX, DXS, GPT,
-MGR, SGP, CHC, CQR, CQE, RGN, HMC, HDN, ARF, CNI, CIP, COF, BWP, WPR, ABG,
-LLC, CLW, CDP, GOZ, DXI, CMW, GDI, HCW, INA, LIC, QAL), major retail and
-food tenants (COL, WOW, WES, JBH, HVN, SUL, PMV, MYR, LOV, NCK, AX1, BBN,
-DMP, CKF, GYG), and childcare/aged care operators (GEM, REG).
+Plus **48 ASX tickers** whose price-sensitive announcements are pulled every
+edition: A-REITs and fund managers (GMG, SCG, VCX, DXS, GPT, MGR, SGP, CHC,
+CQR, CQE, RGN, HMC, HDN, ARF, CNI, CIP, COF, BWP, WPR, ABG, LLC, CLW, CDP,
+GOZ, DXI, CMW, GDI, HCW, INA, LIC, QAL), major retail and food tenants (COL,
+WOW, WES, JBH, HVN, SUL, PMV, MYR, LOV, NCK, AX1, BBN, DMP, CKF, GYG), and
+childcare/aged care operators (GEM, REG).
 
 ### `config_franchise.yml` — The Franchise Brief
 
-| Key | Entries |
+| Key | Ships with |
 |---|---|
 | `brands` | Domino's · Guzman y Gomez · Zambrero · Grill'd · Boost Juice · Red Rooster · Oporto · Chicken Treat · Chemist Warehouse · Anytime Fitness · F45 · Jetts · Snap Fitness · Bakers Delight · Michel's Patisserie · Poolwerx · Jim's Group · Ray White · LJ Hooker · Harcourts · 7-Eleven · Subway · McDonald's · KFC · Zarraffa's |
-| `investors` | PAG · Quadrant Private Equity · Pacific Equity Partners · Adamantem Capital · Anchorage Capital Partners · Allegro Funds · BGH Capital · Next Capital · Advent Partners · Mercury Capital · Colinton Capital · Potentia Capital · TPG · KKR · Bain Capital |
+| `investors` | PAG · Quadrant · Pacific Equity Partners · Adamantem · Anchorage · Allegro · BGH · Next Capital · Advent Partners · Mercury · Colinton · Potentia · TPG · KKR · Bain Capital |
 | `regulators` | ACCC · Franchise Council of Australia · Fair Work Ombudsman · ASBFEO |
+| `own_group` | *(empty)* |
 
 Plus **33 ASX tickers**, each with a `ticker_notes` entry explaining why it
-matters — franchisors (DMP, RFG, GYG, HVN, SIG, CCV, JYC, KME, OLI), large
-franchisees and multi-site operators (CKF, APE, VVA, SSG), franchise-adjacent
-networks (BAP, AX1, MHJ, LOV, AFG, ALD, VEA, BLX, MTS, ADH, UNI), the majors
-whose site decisions move the market (WES, COL, WOW, EDV), and listed
-investors (SOL, MAF, RPL, BTI, TOP).
+matters — because "Bailador Technology Investments (BTI)" means nothing to a
+franchise reader on its own. Franchisors (DMP, RFG, GYG, HVN, SIG, CCV, JYC,
+KME, OLI), large franchisees and multi-site operators (CKF, APE, VVA, SSG),
+franchise-adjacent networks (BAP, AX1, MHJ, LOV, AFG, ALD, VEA, BLX, MTS,
+ADH, UNI), majors whose site decisions move the market (WES, COL, WOW, EDV),
+and listed investors (SOL, MAF, RPL, BTI, TOP).
 
-Two that are easy to miss: **Harvey Norman's Australian complexes run on a
+Two that are easy to miss, both found by researching the listed universe
+rather than assuming it: **Harvey Norman's Australian complexes run on a
 franchise model**, and **Sigma post-Chemist Warehouse merger** is one of the
-country's largest franchisors. Neither shows up on a naive "franchise" screen.
+country's largest franchisors. Three tickers from that same research turned
+out to be delisted — verify before you add.
 
 ### The one that starts empty
 
@@ -199,10 +204,10 @@ country's largest franchisors. Neither shows up on a naive "franchise" screen.
 
 ```yaml
 portfolio:
-  - asset: Casuarina Square
+  - asset: Example Central
     sector: retail
-    suburb: Casuarina
-    state: NSW
+    suburb: Springfield
+    state: QLD
     anchors: [Coles, Kmart]
     notes: 12,000sqm neighbourhood centre; major expiry FY28
 ```
