@@ -1,47 +1,143 @@
-# The Asset Brief
+# The Brief
 
-A daily automated intelligence email for a head of asset management covering Australian commercial property — transactions, leasing, tenant news, alternatives (childcare/aged care), people moves, proptech, ASX price-sensitive announcements and market signals. AU-wide with a QLD/NSW lens. Lands weekday mornings ~5:45am AEST; Monday wraps the weekend; Friday adds a Week in Review.
+Two automated intelligence emails for a private Australian property group,
+built on one pipeline.
+
+| Edition | Cadence | Covers |
+|---|---|---|
+| **The Asset Brief** | Weekday mornings, ~5:30am AEST | Australian commercial property — transactions, capital and funding, leasing, tenant health, alternatives, operations and compliance, ASX price-sensitive announcements |
+| **The Franchise Brief** | Thursday mornings, ~6:30am AEST | Australian franchising — franchisors and franchisees, the PE/VC and listed companies that invest in them, the landlords that house them, network movement and regulation |
+
+Both read at two levels: a strategic layer for a CEO/COO deciding capital
+allocation, and an operational layer for the team running the assets.
 
 ## How an edition gets made
 
-1. **ASX feed** — price-sensitive announcements are pulled directly from the ASX API for every ticker in `config.yml` (~40 A-REITs, retailers and operators), each linked to its announcement PDF.
-2. **Deep-read pass** — up to 3 substantive announcements per edition (results packs, annual reports, investor presentations, strategy/portfolio updates — dividends and director notices are skipped) have their PDFs downloaded and analysed by a dedicated analyst call that hunts for what most readers miss: cap rate movements buried in the notes, WALE shifts, expiry cliffs, impairments, held-for-sale assets, store network plans. Findings render as a "What most will miss" block under the announcement, each with a page reference. Adds roughly $0.20–0.60 on days with results (results season will be the expensive-and-worth-it weeks). Image-only PDFs that defeat text extraction fall back to a plain link.
-3. **Research pass** — four parallel Claude calls (capital markets / occupiers & people / alternatives & proptech / operations & compliance), each with web search **hard-restricted to the approved source allowlist** — it technically cannot search or cite anything outside it.
-4. **Relevance gate** — every finding is scored 0–10 against the reader's five actual jobs (property management, leasing, marketing, acquisitions & disposals, facilities management) and anything below `min_relevance` in `config.yml` is discarded *before* the editor sees it. Dropped items are logged with their score so you can tune the threshold rather than guess. This is what stops the brief becoming a press-release feed.
-5. **Editor pass** — one Claude call receives the surviving findings (highest-scoring first), ASX items, your **watchlist**, the last 14 days of headlines (no repeats) and the **deal tracker** (open LOIs/DD deals it checks for movement), then writes the edition and a structured deal log. Sections with no genuine news are omitted, not padded.
-6. **Link verification** — every `<a href>` the editor emits is checked against the set of URLs that actually came back from the research and ASX feeds. Anything else is unlinked and logged. A hallucinated link is worse than no link, because it looks checkable.
-7. **Extras** — market signals strip (RBA cash rate, 10yr bond, AUD, A-REIT index move) fetched from official RBA CSVs + Yahoo; optional Grok-sourced funny tweet.
-8. **Send & persist** — emailed via Gmail; the edition is archived to `docs/` and the deal log appended to `data/memory.json`, both committed back to the repo. Over time `data/memory.json` becomes your private transactions database — every deal with price, yield, sector and state.
+1. **ASX feed** — price-sensitive announcements pulled from the ASX API for
+   every ticker in the edition's config, each linked to its PDF.
+2. **Deep-read** — up to 3 substantive announcements per edition have their
+   PDFs downloaded and analysed for what most readers miss: cap rate movements
+   buried in the notes, WALE shifts, expiry cliffs, covenant headroom, store
+   network plans.
+3. **Research** — parallel passes over two independent providers:
+   - **Anthropic clusters**, hard-restricted to the config's source allowlist.
+   - **Grok passes** over the open web. This is not redundancy: every major
+     Australian masthead blocks Anthropic's crawler (see Known limits), so
+     Grok is the only route to AFR, The Australian, SMH and The Age. It runs
+     three passes — general news, a comparables hunt for priced-and-yielded
+     transactions, and a market-intelligence sweep for research releases,
+     assets coming to market, fund M&A and policy.
+4. **Relevance gate** — every finding is scored 0–10 against the reader's
+   actual jobs and anything below `min_relevance` is dropped *before* the
+   editor sees it. Dropped items are logged with their score, so the threshold
+   is tuned from evidence rather than guesswork.
+5. **Recency guard** — enforced in code, not just requested in the prompt.
+   A finding with no verifiable publication date, or older than its category
+   allows, is rejected and logged. High-scoring undated findings get a
+   targeted date lookup first rather than being discarded.
+6. **Cross-edition de-duplication** — a daily email that repeats itself gets
+   ignored. Findings whose URL was already published are dropped, as are
+   those re-reporting a published story under a different URL. Legitimate
+   follow-ups come through the deal tracker, which reports a *verifiable*
+   state change rather than an editorial judgement.
+7. **Editor** — one Opus call writes the edition and a structured deal log.
+8. **Link verification** — every `<a href>` is checked against the URLs that
+   actually came back from research. Anything else is unlinked and logged.
+9. **Deterministic blocks** — the trend table and forward calendar are
+   computed in plain Python and never pass through a model.
+10. **Send and persist** — emailed via Gmail; archived to `docs/`, deal log
+    appended to `data/memory_*.json`, both committed back by the workflow.
 
-## Setup (~15 minutes)
+## The trend engine
 
-1. **Create a private GitHub repo** and push these files (keep `.github/workflows/daily-brief.yml` at that exact path).
-2. **Gmail app password**: Google Account → Security → enable 2-Step Verification → https://myaccount.google.com/apppasswords → create one named "Asset Brief".
-3. **Anthropic API key**: https://console.anthropic.com — add credit. A daily run makes 4 research calls on Sonnet (~32 searches) + 1 editor call on Opus: roughly **$0.80–1.40/day**, call it **$20–30/month**, more in results season when the ASX deep-read fires. The editor is the only Opus call — drop `EDITOR_MODEL` to `claude-sonnet-5` in `daily_brief.py` to roughly halve it.
-4. **(Optional) xAI key** for the tweet section: https://console.x.ai. Skip it and that section is simply omitted.
-5. **Add repo secrets** (Settings → Secrets and variables → Actions): `ANTHROPIC_API_KEY`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, optionally `RECIPIENT_EMAIL` and `XAI_API_KEY`.
-6. **Test**: Actions → "Daily Asset Brief" → Run workflow with **Dry run ticked** — download `brief-preview.html` from the run artifacts and check it. Then run unticked to send for real.
+`data/memory_*.json` accumulates every transaction the brief records — asset,
+sector, state, price, yield, buyer type, agent. `portfolio_trends.py` computes
+medians and cohort movement from it in plain Python:
 
-   To test locally instead, copy `.env.example` to `.env`, fill it in, then `pip install -r requirements.txt` and `python daily_brief.py`. `.env` is gitignored. With `DRY_RUN=1` it writes `brief_preview.html` and sends nothing. A second real send on the same day is refused unless you set `FORCE_SEND=1`, so a re-run can't double-mail your list.
-7. **(Optional) archive site**: Settings → Pages → deploy from branch, folder `/docs` — gives you a browsable archive of every edition.
+> *Retail: median 6.05% across 4 deals (−45bps vs prior cohort)*
 
-## The control panel: `config.yml`
+It refuses to publish a median under three data points and renders nothing at
+all while the database is thin. This is the one thing a competitor cannot get
+by subscribing to the same newsletters — and it only builds if editions run
+daily, so start it early.
 
-Everything you'll routinely change lives here, no code required:
+## Running it
 
-- **`allowed_domains`** — the source allowlist. This works in reverse of a normal search: nothing outside this list can ever appear. Add a domain to admit a source, delete a line to ban one. Check the run log after adding one — if it blocks the crawler you'll see a warning.
-- **`min_relevance`** — the junk filter, 0–10. Findings scoring below it never reach the editor. Start at `5`; raise to `6` if the brief feels padded, drop to `4` if it feels thin. The run log prints every dropped item with its score, so tune from evidence.
-- **`watchlist`** — your tenants, competitors, markets and agents. Matches get a ⚑ WATCHLIST flag and priority placement (your anchor tenant entering administration outranks someone else's $100m deal). `own_group` is you — flagged, but not written up as a competitor.
-- **`asx_tickers`** — the companies whose price-sensitive announcements are pulled every edition.
+```bash
+pip install -r requirements.txt
+cp .env.example .env          # then fill it in; .env is gitignored
 
-Deeper tuning (tone, sections, thresholds, send time) lives at the top of `daily_brief.py` and in the workflow cron (UTC; Brisbane = UTC+10 year-round).
+python editions.py property    # the daily
+python editions.py franchise   # the weekly
+python editions.py all         # both in sequence
+```
 
-## Notes and known limits
+`DRY_RUN=1` writes `brief_preview.html` and sends nothing. A second real send
+on the same day is refused unless `FORCE_SEND=1`, so a re-run can't double-mail.
 
-- **The major mastheads are not available, and this is a hard limit.** AFR, The Australian, SMH, The Age, Courier Mail and Brisbane Times all block Anthropic's web crawler. They cannot be searched or cited, and worse, leaving one in `allowed_domains` makes the API reject the **entire** search request — one bad domain silently kills a whole research cluster. The code now strips offending domains and retries, logging `[warn] ... dropping domains blocked to the crawler`; when you see that, delete them from `config.yml`. The practical consequence is that the brief runs on trade press (Australian Property Journal, The Urban Developer, RealCommercial, Inside Retail, The Sector et al.), agency press rooms, industry bodies and the ASX — which is where most of the specifics live anyway, but you will not get AFR scoops here.
-- **Verify tickers before adding them.** A delisted or wrong code returns HTTP 400 and is skipped with a warning, so it fails quietly forever. `NSR` and `HPI` were removed for exactly this reason.
-- **The deal tracker and Week in Review get smarter with age** — they read from `data/memory.json`, which starts empty. Give it two weeks before judging those features.
-- **ASX API** — unofficial (it's what the ASX website itself uses). If it ever changes again, the section fails gracefully and the rest of the email still sends; check the Action logs for `[warn] ASX` lines.
-- **Trust but verify** — the model can garble a yield. Every item is linked; click through before repeating a number in a meeting.
-- **GitHub cron drifts 5–15 min** at busy times. If a run fails outright, GitHub emails you and you can re-run from the Actions tab.
-- **Querying your deal database**: `data/memory.json` is plain JSON — e.g. `python -c "import json;[print(i) for i in json.load(open('data/memory.json'))['items'] if i.get('sector')=='childcare' and i.get('state')=='QLD']"`.
+## Adding an edition
+
+Editions are one function each in `editions.py`. The pipeline in
+`daily_brief.py` is edition-agnostic; an edition supplies only its editorial
+position — audience, relevance rubric, research clusters, section order — plus
+a config file. `franchise_content.py` is the worked example.
+
+## The control panels: `config.yml` and `config_franchise.yml`
+
+- **`portfolio`** — *the highest-leverage field in the file, and it starts
+  empty.* Fill in your actual assets (name, sector, suburb, anchors) and every
+  pass shifts from "is this important?" to "does this touch something we own?"
+  A centre trading two suburbs from yours is a direct valuation comparable.
+- **`watchlist`** — tenants, competitors, markets, agents. Matches get a
+  ⚑ WATCHLIST flag and priority placement. `own_group` is you, and is written
+  about as such rather than as a rival.
+- **`allowed_domains`** — the allowlist for the Anthropic passes. Add a domain
+  to admit a source; check the run log afterwards, because a domain that
+  blocks the crawler makes the API reject the *whole* request.
+- **`blocked_domains`** — never contributed by Grok regardless of score.
+  Retail stock-commentary sites live here.
+- **`min_relevance`** — the junk filter, 0–10. Start at 5.
+- **`max_finding_age_days` / `max_comparable_age_days` / `max_intel_age_days`**
+  — recency ceilings by category. News is strict; a comparable stays useful
+  far longer than a news story, and a quarterly research release *is* the
+  current benchmark for months.
+- **`ticker_notes`** — why each listed company matters, shown beside its
+  announcements. Without it an unfamiliar ticker is noise.
+- **`asx_tickers`** — verify new codes against the ASX API before adding;
+  a delisted code fails silently forever.
+
+## Cost
+
+Measured, and printed as a `COST` line at the end of every run:
+
+| | Per edition | Per month |
+|---|---|---|
+| Asset Brief (daily, ~21/mo) | ~$1.80–2.00 | **~$40** |
+| Franchise Brief (weekly, ~4/mo) | ~$2.40–2.50 | **~$10** |
+
+Anthropic only — Grok is billed separately by xAI. Input tokens dominate,
+because the server-side search loop resends accumulated results each
+iteration. Reducing search count does *not* reliably reduce cost; the model
+simply uses more per call.
+
+## Known limits
+
+- **Every major Australian masthead blocks Anthropic's crawler** — AFR, The
+  Australian, SMH, The Age, Courier Mail, Brisbane Times, ABC, news.com.au,
+  The Guardian. Worse, leaving one in `allowed_domains` makes the API reject
+  the entire request. The code strips offending domains and retries, logging
+  a warning; prune them when you see it. Grok is what recovers this coverage.
+- **Grok is not allowlist-constrained.** It searches the open web, which is
+  why it reaches the mastheads — but the "nothing outside the list can appear"
+  guarantee does not hold for its findings. Off-list domains are logged every
+  run; set `enforce_allowlist_for_grok: true` to restore the hard guarantee at
+  the cost of losing sources you have not pre-approved.
+- **Yield swings run to run.** A thin week is thin regardless of thresholds;
+  raising a ceiling removes a rejection but cannot retrieve what the search
+  did not surface.
+- **Research-house landing pages are often undated** by design, and are
+  rejected by the recency guard even after a date lookup.
+- **The ASX API is unofficial** (it is what asx.com.au itself uses). Failures
+  are logged and skipped; check the run summary for `[warn] ASX` lines.
+- **Trust but verify.** Every item is linked. Click through before repeating
+  a number in a meeting.
